@@ -411,7 +411,7 @@ export default class extends Command {
                         },
                         {
                             label: 'timestamp',
-                            description: 'Add a timestamp',
+                            description: 'Add a timestamp.',
                             value: 'timestamp',
                         },
                     ),
