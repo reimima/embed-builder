@@ -12,14 +12,14 @@ export default class extends Command {
     }
 
     public async run(interaction: CommandInteraction<'cached'>): Promise<Message> {
-        const i = await interaction.reply(
+        const sent = await interaction.reply(
             { embeds: [{ color: 'RANDOM', title: 'Now loading...', description: 'Please wait...' }], fetchReply: true },
         );
-        return i.edit({ embeds: [
+        return sent.edit({ embeds: [
             new MessageEmbed()
                 .setColor('RANDOM')
                 .setTitle('Pong!')
-                .setDescription(`⌛ ${this.client.ws.ping}ms \n\n💬 ${Date.now() - i.createdTimestamp}ms`),
+                .setDescription(`⌛ ${this.client.ws.ping}ms \n\n💬 ${Date.now() - sent.createdTimestamp}ms`),
         ] });
     }
 }

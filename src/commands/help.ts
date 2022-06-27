@@ -13,7 +13,7 @@ export default class extends Command {
 
     public run(interaction: CommandInteraction<'cached'>) {
         interaction.reply({ embeds: [new MessageEmbed()
-            .setTitle('About Embed Builder.')
+            .setTitle('About Embed Builder')
             .setDescription(`
                 Hi! First of all, thank you for introducing this bot.
 
