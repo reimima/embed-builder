@@ -354,7 +354,7 @@
             {
               "selector": "typeLike",
               "format": [
-                "StrictPascalCase"
+                "camelCase"
               ]
             },
             {

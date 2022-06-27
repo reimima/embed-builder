@@ -1,423 +1,518 @@
-import type { CommandInteraction, EmbedAuthorData, Interaction, Message, SelectMenuInteraction } from 'discord.js';
-import type { Bot } from 'src/Bot';
-import { InteractionCollector, MessageActionRow, MessageEmbed, MessageSelectMenu } from 'discord.js';
+import type { Bot } from '../Bot';
+import type { Message, SelectMenuInteraction, GuildTextBasedChannel, EmbedFieldData, CommandInteraction, Interaction, ColorResolvable, MessageEmbedAuthor, MessageEmbedFooter, ButtonInteraction } from 'discord.js';
+import { MessageEmbed, MessageActionRow, MessageSelectMenu, InteractionCollector, MessageButton } from 'discord.js';
 import { Command } from '../interfaces';
 
 export default class extends Command {
-    private title: string;
-    private description: string;
-    private readonly author: EmbedAuthorData;
-    private isTimestamp: boolean;
-    private titleUrl: string;
-    private noteMessage!: Message;
+    private readonly embed: MessageEmbed;
+    private note!: Message;
+    private baseInteraction!: SelectMenuInteraction<'cached'>;
+    private channel!: GuildTextBasedChannel;
+    private fields!: EmbedFieldData[];
+    private isTimestamp = true;
 
     public constructor(public override readonly client: Bot) {
         super(client, {
             name: 'build',
-            description: 'Let\'s build your own embed!',
+            description: 'Let\'s make your own embed!',
         });
 
-        this.title = 'Some title.';
-        this.description = 'Some description';
-        this.author = {
-            name: 'Some name.',
-            iconURL: 'https://cdn.discordapp.com/embed/avatars/2.png',
-            url: 'https://discord.com/',
-        };
-        this.isTimestamp = false;
-        this.titleUrl = 'https://discord.com/';
+        this.fields = [{ name: 'Some name.', value: 'Some value.' }];
+
+        this.embed = new MessageEmbed()
+            .setColor('#000000')
+            .setTitle('Some title.')
+            .setURL('https://discord.com/')
+            .setDescription('Some description.')
+            .setAuthor({ name: 'Some name.', url: 'https://discord.com/', iconURL: 'https://cdn.discordapp.com/embed/avatars/2.png' })
+            .setThumbnail('https://cdn.discordapp.com/embed/avatars/2.png')
+            .setImage('https://cdn.discordapp.com/embed/avatars/2.png')
+            .setFooter({ text: 'Some text.', iconURL: 'https://cdn.discordapp.com/embed/avatars/2.png' })
+            .addFields(this.fields)
+            .setTimestamp();
     }
 
     public run(interaction: CommandInteraction<'cached'>) {
         const customId = Math.random().toString(36).substring(7);
 
+        const selectmenu = new MessageActionRow().addComponents(new MessageSelectMenu()
+            .setCustomId(customId)
+            .setOptions({
+                label: 'color',
+                description: 'Setting color of embed',
+                value: 'color',
+            }, {
+                label: 'title',
+                description: 'Setting title of embed.',
+                value: 'title',
+            }, {
+                label: 'titleUrl',
+                description: 'Setting url of title.',
+                value: 'titleUrl',
+            }, {
+                label: 'description',
+                description: 'Setting description of embed.',
+                value: 'description',
+            }, {
+                label: 'timestamp',
+                description: 'Setting timestamp on/off.',
+                value: 'timestamp',
+            }, {
+                label: 'author',
+                description: 'Setting author options of embed.',
+                value: 'author',
+            }, {
+                label: 'thumbnail',
+                description: 'Setting thumbnail image of embed.',
+                value: 'thumbnail',
+            }, {
+                label: 'iamge',
+                description: 'Setting normal image of embed.',
+                value: 'image',
+            }, {
+                label: 'footer',
+                description: 'Setting footer options of embed.',
+                value: 'footer',
+            }, {
+                label: 'fields',
+                description: 'Setting filed options of embed.',
+                value: 'fields',
+            }, {
+                label: 'channel',
+                description: 'Setting channel you want to send.',
+                value: 'channel',
+            }, {
+                label: 'exit',
+                description: 'Exit from here.',
+                value: 'exit',
+            }));
+
         interaction.reply({
-            embeds: this.buildEmbeds(
-                this.title,
-                this.titleUrl,
-                this.description,
-                this.author,
-                this.isTimestamp,
-            ),
-            components: this.buildComponents(customId),
+            embeds: [this.embed],
+            components: [selectmenu],
         });
 
         const collecter = new InteractionCollector(this.client, {
-            filter: i => i.isSelectMenu() && customId.includes(i.customId),
+            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
+            time: 300000,
         });
 
-        collecter.on('collect', (i: Interaction<'cached'>) => {
-            if (!i.isSelectMenu()) return;
-            this.onInteraction(i);
+        collecter.on('collect', async (selectMenuI: Interaction<'cached'>) => {
+            if (!selectMenuI.isSelectMenu()) return;
+            this.baseInteraction = selectMenuI; await this.onSelectMenuI();
         });
+        collecter.on('end', () => collecter.stop());
     }
 
-    private async onInteraction(i: SelectMenuInteraction<'cached'>) {
-        await i.update({ content: undefined });
-        const target = i.values[0];
+    private async onSelectMenuI() {
+        await this.baseInteraction.update({ content: undefined });
+        const value = this.baseInteraction.values[0] as string;
 
-        if (target === 'author') {
-            this.onAuthor(i);
-            return;
+        const channel = this.channel = this.baseInteraction.channel as GuildTextBasedChannel;
+
+        switch (value) {
+            case 'titleUrl': this.note = await channel.send({ embeds: [{ description: 'If you want to delete this option, you can send `delete`.' }] }); break;
+
+            case 'timestamp': if (this.isTimestamp) {
+                this.isTimestamp = false; this.baseInteraction.editReply({ embeds: [this.embed.setTimestamp(null)] });
+            } else {
+                this.isTimestamp = true; this.baseInteraction.editReply({ embeds: [this.embed.setTimestamp()] });
+            } return;
+
+            case 'author': this.onCaseAuthor(); return;
+
+            case 'thumbnail': this.note = await this.channel.send({ embeds: [{ description: `
+                - You can only send image attachments or image urls.
+                - Don't send anything other url.
+                - If you want to delete this option, you can send \`delete\`.
+            ` }] }); break;
+
+            case 'image': this.note = await this.channel.send({ embeds: [{ description: `
+                - You can only send image attachments or image urls.
+                - Don't send anything other url.
+                - If you want to delete this option, you can send \`delete\`.
+            ` }] }); break;
+
+            case 'footer': this.onCaseFooter(); return;
+
+            case 'fields': this.onCaseFields(); return;
+
+            case 'channel': this.note = await this.channel.send({ embeds: [{ description: `- You must send only channel mentions.` }] }); break;
+
+            case 'exit': this.baseInteraction.deleteReply(); this.baseInteraction.channel?.send({ embeds: [this.baseInteraction.message.embeds[0] as MessageEmbed] });
+                return;
         }
 
-        if (target === 'timestamp') {
-            this.onTimestamp();
-            i.editReply({
-                embeds: this.buildEmbeds(
-                    this.title,
-                    this.titleUrl,
-                    this.description,
-                    this.author,
-                    this.isTimestamp,
-                ),
-            });
-            return;
-        }
+        const sent = await channel.send({ content: 'Please send messages. ' }),
+            collected = await channel.awaitMessages({ filter: (res: Message) => res.author.id === this.baseInteraction.user.id, max: 1 }),
+            res = collected.first() as Message;
 
-        const message = await i.channel?.send({ embeds: [
-            new MessageEmbed()
-                .setDescription('Send your choice word.'),
-        ] }) as Message;
-
-        const filter = (res: Message) => i.user.id === res.author.id;
-        const collected = await i.channel?.awaitMessages({ filter: filter, max: 1 });
-        const res = collected?.first() as Message;
-
-        switch (target) {
-            case 'title':
-                await i.editReply({
-                    embeds: this.buildEmbeds(
-                        res.content,
-                        this.titleUrl,
-                        this.description,
-                        this.author,
-                        this.isTimestamp,
-                    ),
-                }).then(() => {
-                    this.deleteTarget(message, res);
-                    this.title = res.content;
-                });
+        switch (value) {
+            case 'color':
+                if (!this.isHEX(res.content)) return this.onIsNot(this.baseInteraction, 'Don\'t send anything other than the HEX code.', sent, res);
+                await this.baseInteraction.editReply({ embeds: [this.embed.setColor(res.content as ColorResolvable)] });
+                this.deleteMessages(sent, res);
                 break;
 
-            case 'description':
-                await i.editReply({
-                    embeds: this.buildEmbeds(
-                        this.title,
-                        this.titleUrl,
-                        res.content,
-                        this.author,
-                        this.isTimestamp,
-                    ),
-                }).then(() => {
-                    this.deleteTarget(message, res);
-                    this.description = res.content;
-                });
+            case 'title':
+                if (res.content.length > 256) return this.onIsNot(this.baseInteraction, 'The title should be 256 characters or less.', sent, res);
+                await this.baseInteraction.editReply({ embeds: [this.embed.setTitle(res.content)] });
+                this.deleteMessages(sent, res);
                 break;
 
             case 'titleUrl':
-                if (this.checkUrl(res.content)) {
-                    await i.editReply({
-                        embeds: this.buildEmbeds(
-                            this.title,
-                            res.content,
-                            this.description,
-                            this.author,
-                            this.isTimestamp,
-                        ),
-                    }).then(() => {
-                        this.deleteTarget(message, res);
-                        this.titleUrl = res.content;
-                    });
-                } else {
-                    const announce = await i.channel?.send({ content: `${i.user.toString()}, It is not an URL.` }) as Message;
-                    this.deleteTarget(message, res);
-                    await this.sleep(3000).then(() => announce.delete());
-                }
+                if (res.content === 'delete') return Promise.all([this.baseInteraction.editReply({ embeds: [this.embed.setURL('')] }), this.deleteMessages(sent, res, this.note)]);
+                if (!this.isURL(res.content)) return this.onIsNot(this.baseInteraction, 'This url isn\'t a valid.', sent, res, this.note);
+                await this.baseInteraction.editReply({ embeds: [this.embed.setURL(res.content)] });
+                this.deleteMessages(sent, res, this.note);
                 break;
+
+            case 'description':
+                await this.baseInteraction.editReply({ embeds: [this.embed.setDescription(res.content)] });
+                this.deleteMessages(sent, res);
+                break;
+
+            case 'thumbnail': this.onImage(this.baseInteraction, res, sent, value); break;
+
+            case 'image': this.onImage(this.baseInteraction, res, sent, value); break;
+
+            case 'channel': this.onChannel(sent, res); break;
         }
     }
 
-    private onTimestamp() {
-        if (this.isTimestamp) {
-            this.isTimestamp = false;
-        } else {
-            this.isTimestamp = true;
-        }
-    }
-
-    private async onAuthor(baseI: SelectMenuInteraction<'cached'>) {
-        const customId = Math.random().toString(36).substring(7);
-
-        const embed = new MessageEmbed()
-            .setTitle('Set an author options.')
-            .addFields(
-                { name: 'Name', value: 'Set a author\'s name.' },
-                { name: 'Icon?', value: 'Set a author\'s icon. You can delete this option.' },
-                { name: 'NameUrl?', value: 'Name\'s url. You can delete this option.' },
-            );
-
-        const selectMenu = new MessageActionRow().addComponents(
-            new MessageSelectMenu()
+    private async onCaseAuthor() {
+        const customId = Math.random().toString(36).substring(7),
+            selectmenu = new MessageActionRow().addComponents(new MessageSelectMenu()
                 .setCustomId(customId)
-                .setOptions(
-                    {
-                        label: 'name',
-                        description: 'Set a author\'s name',
-                        value: 'name',
-                    },
-                    {
-                        label: 'icon',
-                        description: 'Set a author\'s icon. You can delete this option.',
-                        value: 'icon',
-                    },
-                    {
-                        label: 'nameUrl',
-                        description: 'Name\'s url. You can delete this option.',
-                        value: 'nameUrl',
-                    },
-                ),
-        );
+                .addOptions(
+                    { label: 'name', description: 'Set a name of author.', value: 'name' },
+                    { label: 'url?', description: 'Set a url of author name. You can delete this option.', value: 'url' },
+                    { label: 'iconURL', description: 'Set a url of author icon. You can delete this option.', value: 'icon' },
+                    { label: 'exit', description: 'Exit from here.', value: 'exit' }));
 
-        await baseI.channel?.send({
-            embeds: [embed],
-            components: [selectMenu],
-        });
+        await this.channel.send({ embeds: [new MessageEmbed().setTitle('Options of author.').addFields(
+            { name: 'name', value: 'Set a name of author.' }, { name: 'url?', value: 'Set a url of author name. You can delete this option.' },
+            { name: 'iconURL?', value: 'Set a url of author icon. You can delete this option.' }, { name: 'exit', value: 'Exit from here.' },
+        )], components: [selectmenu] });
 
         const collecter = new InteractionCollector(this.client, {
-            filter: authorI => authorI.isSelectMenu() && customId.includes(authorI.customId),
+            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
+            time: 300000,
         });
 
-        collecter.on('collect', (authorI: SelectMenuInteraction<'cached'>) => {
-            if (!authorI.isSelectMenu) return;
-            this.onAuthorInteraction(authorI, baseI);
+        collecter.on('collect', async (interaction: Interaction<'cached'>) => {
+            if (!interaction.isSelectMenu()) return;
+            await this.onAuthorCollected(interaction);
         });
+        collecter.on('end', () => collecter.stop());
     }
 
-    private async onAuthorInteraction(authorI: SelectMenuInteraction<'cached'>, baseI: SelectMenuInteraction<'cached'>) {
-        authorI.update({ content: undefined });
-        const target = authorI.values[0];
+    private async onCaseFooter() {
+        const customId = Math.random().toString(36).substring(7),
+            selectmenu = new MessageActionRow().addComponents(new MessageSelectMenu()
+                .setCustomId(customId)
+                .addOptions(
+                    { label: 'text', description: 'Set a text of footer.', value: 'text' },
+                    { label: 'iconURL', description: 'Set a url of footer icon. You can delete this option.', value: 'icon' },
+                    { label: 'exit', description: 'Exit from here.', value: 'exit' }));
 
-        if (target === 'icon') {
-            const noteEmbed = new MessageEmbed()
-                .setTitle('Note.')
-                .setDescription(`
-                - You can send image file or image url.
-                - Don't send another url.
-                - If you want to delete this option, send \`delete\`.
-            `);
+        await this.channel.send({ embeds: [new MessageEmbed().setTitle('Options of footer.').addFields(
+            { name: 'text', value: 'Set a text of footer.' }, { name: 'iconURL?', value: 'Set a url of footer icon. You can delete this option.' }, { name: 'exit', value: 'Exit from here.' },
+        )], components: [selectmenu] });
 
-            this.noteMessage = await authorI.channel?.send({
-                embeds: [noteEmbed],
-            }) as Message;
+        const collecter = new InteractionCollector(this.client, {
+            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
+            time: 300000,
+        });
+
+        collecter.on('collect', async (interaction: Interaction<'cached'>) => {
+            if (!interaction.isSelectMenu()) return;
+            await this.onFooterCollected(interaction);
+        });
+        collecter.on('end', () => collecter.stop());
+    }
+
+    private async onCaseFields() {
+        const customId = Math.random().toString(36).substring(7),
+            selectmenu = new MessageActionRow().addComponents(new MessageSelectMenu()
+                .setCustomId(customId)
+                .addOptions(
+                    { label: 'individual', description: 'Set for each field.', value: 'individual' },
+                    { label: 'inline', description: 'Setting inline on.', value: 'inline' },
+                    { label: 'uninline', description: 'Setting inline off.', value: 'uninline' },
+                    { label: 'number', description: 'Sets the number of fields. You can choose from `1 ~ 25`', value: 'number' },
+                    { label: 'exit', description: 'Exit from here.', value: 'exit' }));
+
+        await this.channel.send({ embeds: [new MessageEmbed().setTitle('Options of fields.').addFields(
+            { name: 'individual', value: 'Set for each field.' }, { name: 'inline', value: 'Setting inline on.' }, { name: 'uninline', value: 'Setting inline off.' },
+            { name: 'number', value: 'Sets the number of fields. You can choose from `1 ~ 25`' }, { name: 'exit', value: 'Exit from here.' },
+        )], components: [selectmenu] });
+
+        const collecter = new InteractionCollector(this.client, {
+            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
+            time: 300000,
+        });
+
+        collecter.on('collect', async (interaction: Interaction<'cached'>) => {
+            if (!interaction.isSelectMenu()) return;
+            await this.onFieldsCollected(interaction);
+        });
+        collecter.on('end', () => collecter.stop());
+    }
+
+    private async onAuthorCollected(interaction: SelectMenuInteraction<'cached'>) {
+        await interaction.update({ content: undefined });
+        const value = interaction.values[0] as string;
+
+        switch (value) {
+            case 'url': this.note = await this.channel.send({ embeds: [{ description: 'If you want to delete this option, you can send `delete`.' }] }); break;
+
+            case 'icon': this.note = await this.channel.send({ embeds: [{ description: `
+                - You can only send image attachments or image urls.
+                - Don't send anything other url.
+                - If you want to delete this option, you can send \`delete\`.
+            ` }] }); break;
+
+            case 'exit': interaction.deleteReply(); return;
         }
 
-        if (target === 'nameUrl') {
-            const noteEmbed = new MessageEmbed()
-                .setTitle('Note.')
-                .setDescription(`
-                - If you want to delete this option, send \`delete\`.
-            `);
+        const sent = await this.channel.send({ content: 'Please send messages. ' }),
+            collected = await this.channel.awaitMessages({ filter: (res: Message) => res.author.id === interaction.user.id, max: 1 }),
+            res = collected.first() as Message,
+            author = this.embed.author as MessageEmbedAuthor;
 
-            this.noteMessage = await authorI.channel?.send({
-                embeds: [noteEmbed],
-            }) as Message;
-        }
-
-        const message = await authorI.channel?.send({ embeds: [
-            new MessageEmbed()
-                .setDescription('Send your choice word.'),
-        ] }) as Message;
-
-        const filter = (res: Message) => authorI.user.id === res.author.id;
-        const collected = await authorI.channel?.awaitMessages({ filter: filter, max: 1 });
-        const res = collected?.first() as Message;
-
-        switch (target) {
+        switch (value) {
             case 'name':
-                this.author.name = res.content;
-                baseI.editReply({
-                    embeds: this.buildEmbeds(
-                        this.title,
-                        this.titleUrl,
-                        this.description,
-                        this.author,
-                        this.isTimestamp,
-                    ),
-                }).then(() => this.deleteTarget(message, res));
+                if (res.content.length > 256) return this.onIsNot(interaction, 'The name should be 256 characters or less.', sent, res);
+                await this.baseInteraction.editReply({ embeds: [this.embed.setAuthor({ name: res.content, url: author.url, iconURL: author.iconURL })] });
+                this.deleteMessages(sent, res);
                 break;
 
-            case 'icon':
-                this.onIconURL(baseI, authorI, message, res);
+            case 'url':
+                if (res.content === 'delete') return Promise.all([this.baseInteraction.editReply({ embeds: [this.embed.setAuthor({ name: author.name, url: '', iconURL: author.iconURL })] }), this.deleteMessages(sent, res, this.note)]);
+                if (!this.isURL(res.content)) return this.onIsNot(interaction, 'This url isn\'t a valid.', sent, res, this.note);
+                await this.baseInteraction.editReply({ embeds: [this.embed.setAuthor({ name: author.name, url: res.content, iconURL: author.iconURL })] });
+                this.deleteMessages(sent, res, this.note);
                 break;
 
-            case 'nameUrl':
-                if (this.checkUrl(res.content)) {
-                    this.author.url = res.content;
-                    await baseI.editReply({
-                        embeds: this.buildEmbeds(
-                            this.title,
-                            this.titleUrl,
-                            this.description,
-                            this.author,
-                            this.isTimestamp,
-                        ),
-                    }).then(() => this.deleteTarget(message, res, this.noteMessage));
-                } else {
-                    if (res.content === 'delete') {
-                        this.author.url = undefined;
-                        await baseI.editReply({
-                            embeds: this.buildEmbeds(
-                                this.title,
-                                this.titleUrl,
-                                this.description,
-                                this.author,
-                                this.isTimestamp,
-                            ),
-                        }).then(() => this.deleteTarget(message, res, this.noteMessage));
-                        return;
-                    }
-                    const announce = await authorI.channel?.send({ content: `${authorI.user.toString()}, It is not an URL.` }) as Message;
-                    this.deleteTarget(message, res);
-                    await this.sleep(3000).then(() => announce.delete());
-                }
+            case 'icon': this.onImage(interaction, res, sent, value); break;
+        }
+    }
+
+    private async onFooterCollected(interaction: SelectMenuInteraction<'cached'>) {
+        await interaction.update({ content: undefined });
+        const value = interaction.values[0] as string;
+
+        switch (value) {
+            case 'icon': this.note = await this.channel.send({ embeds: [{ description: `
+                - You can only send image attachments or image urls.
+                - Don't send anything other url.
+                - If you want to delete this option, you can send \`delete\`.
+            ` }] }); break;
+
+            case 'exit': interaction.deleteReply(); return;
+        }
+
+        const sent = await this.channel.send({ content: 'Please send messages. ' }),
+            collected = await this.channel.awaitMessages({ filter: (res: Message) => res.author.id === interaction.user.id, max: 1 }),
+            res = collected.first() as Message,
+            footer = this.embed.footer as MessageEmbedFooter;
+
+        switch (value) {
+            case 'text':
+                if (res.content.length > 2048) return this.onIsNot(interaction, 'The text should be 2048 characters or less.', sent, res);
+                await this.baseInteraction.editReply({ embeds: [this.embed.setFooter({ text: res.content, iconURL: footer.iconURL })] });
+                this.deleteMessages(sent, res);
+                break;
+
+            case 'icon': this.onImage(interaction, res, sent, value); break;
+        }
+    }
+
+    private async onFieldsCollected(interaction: SelectMenuInteraction<'cached'>) {
+        await interaction.update({ content: undefined });
+        const value = interaction.values[0];
+
+        switch (value) {
+            case 'individual': this.onFieldsIndividual(); break;
+
+            // eslint-disable-next-line no-return-assign
+            case 'inline': this.fields = this.fields.map(x => Object.assign(x, x.inline = true));
+                this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] });
+                break;
+
+            // eslint-disable-next-line no-return-assign
+            case 'uninline': this.fields = this.fields.map(x => Object.assign(x, x.inline = false));
+                this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] });
+                break;
+
+
+            case 'number': this.onFieldsNumber(); break;
+
+            case 'exit': interaction.deleteReply(); break;
+        }
+    }
+
+    private async onFieldsIndividual() {
+        const sent = await this.channel.send({ embeds: [{ description: 'Make individual settings for the fields. You can choose from 1 ~ 25.' }] }),
+            collected = await this.channel.awaitMessages({ filter: (res: Message) => res.author.id === this.baseInteraction.user.id, max: 1 }),
+            res = collected.first() as Message,
+            customId = Math.random().toString(36).substring(7);
+
+        this.deleteMessages(res, sent);
+        if (!((Number(res.content) - 1) * (Number(res.content) - this.fields.length) <= 0)) return this.onIsNot(this.baseInteraction, 'Sorry, I can\'t found the field.');
+
+        this.note = await this.channel.send({ embeds: [new MessageEmbed().setTitle(`Individual setting menu`).addFields(
+            { name: 'name', value: 'Set a name of field.' }, { name: 'value', value: 'Set a value of field.' }, { name: 'exit', value: 'Exit from here.' },
+        )], components: [new MessageActionRow().addComponents(new MessageSelectMenu().setCustomId(customId).addOptions(
+            { label: 'name', description: 'Set a name of field.', value: 'name' },
+            { label: 'value', description: 'Set a value of field.', value: 'field' },
+            { label: 'exit', description: 'Exit from here.', value: 'exit' },
+        ))] });
+
+        const collecter = new InteractionCollector(this.client, {
+            filter: interactionCollected => interactionCollected.isSelectMenu() && customId.includes(interactionCollected.customId),
+            time: 300000,
+        });
+
+        collecter.on('collect', async (interaction: Interaction<'cached'>) => {
+            if (!interaction.isSelectMenu()) return;
+            await this.onFieldsIndividualCollected(interaction, Number(res.content));
+        });
+        collecter.on('end', () => collecter.stop());
+    }
+
+    private async onFieldsIndividualCollected(interaction: SelectMenuInteraction<'cached'>, number: number) {
+        await interaction.update({ content: undefined });
+        const value = interaction.values[0];
+
+        if (value === 'exit') return interaction.deleteReply();
+
+        const sent = await this.channel.send({ content: 'Please send messages. ' }),
+            collected = await this.channel.awaitMessages({ filter: (res: Message) => res.author.id === interaction.user.id, max: 1 }),
+            res = collected.first() as Message;
+
+        switch (value) {
+            case 'name':
+                if (res.content.length > 256) return this.onIsNot(interaction, 'The name should be 256 characters or less.', sent, res);
+                (this.fields[number - 1] as EmbedFieldData).name = res.content;
+                await this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] });
+                this.deleteMessages(sent, res);
+                break;
+
+            case 'value':
+                if (res.content.length > 1024) return this.onIsNot(interaction, 'The value should be 1024 characters or less.', sent, res);
+                (this.fields[number - 1] as EmbedFieldData).value = res.content;
+                await this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] });
+                this.deleteMessages(sent, res);
                 break;
         }
     }
 
-    private async onIconURL(
-        baseI: SelectMenuInteraction<'cached'>,
-        authorI: SelectMenuInteraction<'cached'>,
-        message: Message,
-        res: Message,
-    ) {
-        const file = res.attachments.first();
+    private async onFieldsNumber() {
+        const plusCustomId = Math.random().toString(36).substring(7),
+            minusCustomId = Math.random().toString(36).substring(7),
+            deleteCustomId = Math.random().toString(36).substring(7),
+            button = new MessageActionRow().addComponents(
+                new MessageButton().setCustomId(plusCustomId).setEmoji('➕').setStyle('SUCCESS'),
+                new MessageButton().setCustomId(minusCustomId).setEmoji(`➖`).setStyle('DANGER'),
+                new MessageButton().setCustomId(deleteCustomId).setEmoji('🗑️').setStyle('DANGER'));
 
-        if (file) {
-            this.author.iconURL = file.url;
-            baseI.editReply({
-                embeds: this.buildEmbeds(
-                    this.title,
-                    this.titleUrl,
-                    this.description,
-                    this.author,
-                    this.isTimestamp,
-                ),
-            }).then(() => this.deleteTarget(message, res, this.noteMessage));
-        } else if (!file) {
-            if (this.isImageUrl(res.content)) {
-                this.author.iconURL = res.content;
-                baseI.editReply({
-                    embeds: this.buildEmbeds(
-                        this.title,
-                        this.titleUrl,
-                        this.description,
-                        this.author,
-                        this.isTimestamp,
-                    ),
-                }).then(() => this.deleteTarget(message, res, this.noteMessage));
-            } else {
-                if (res.content === 'delete') {
-                    this.author.iconURL = undefined;
-                    baseI.editReply({
-                        embeds: this.buildEmbeds(
-                            this.title,
-                            this.titleUrl,
-                            this.description,
-                            this.author,
-                            this.isTimestamp,
-                        ),
-                    }).then(() => this.deleteTarget(message, res, this.noteMessage));
-                    return;
+        await this.channel.send({ embeds: [new MessageEmbed().setTitle('Number of fields').setDescription(`
+            - Press ➕ if you want to add to the field.
+            - Press ➖ if you want to delete to the filed.
+            - If you want to delete this option menu, you can press \`🗑️\`.
+        `)], components: [button] });
+
+        const collecter = new InteractionCollector(this.client, { componentType: 'BUTTON', time: 300000 });
+
+        collecter.on('collect', (interaction: Interaction<'cached'>) => {
+            if (!interaction.isButton()) return;
+            this.onNumberButtonCollected(interaction, plusCustomId, minusCustomId, deleteCustomId);
+        });
+        collecter.on('end', () => collecter.stop());
+    }
+
+    private async onNumberButtonCollected(interaction: ButtonInteraction<'cached'>, plusCustomId: string, minusCustomId: string, deleteCustomId: string) {
+        await interaction.update({ content: undefined });
+
+        switch (interaction.customId) {
+            case plusCustomId: this.fields.push({ name: 'Some name.', value: 'Some value.' });
+                this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] }); break;
+
+            case minusCustomId: this.fields.pop();
+                this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] }); break;
+
+            case deleteCustomId: interaction.deleteReply(); break;
+        }
+    }
+
+    private async onImage(interaction: SelectMenuInteraction<'cached'>, res: Message, sent: Message, value: string) {
+        const file = res.attachments.first(),
+            author = this.embed.author as MessageEmbedAuthor;
+
+        if (!file) {
+            if (res.content === 'delete') {
+                switch (value) {
+                    case 'icon': await this.baseInteraction.editReply({ embeds: [this.embed.setAuthor({ name: author.name, url: author.url, iconURL: '' })] }); this.deleteMessages(res, sent, this.note);
+                        break;
+
+                    case 'thumbnail': await this.baseInteraction.editReply({ embeds: [this.embed.setThumbnail('')] }); this.deleteMessages(res, sent, this.note);
+                        break;
+
+                    case 'image': await this.baseInteraction.editReply({ embeds: [this.embed.setImage('')] }); this.deleteMessages(res, sent, this.note);
+                        break;
                 }
-                const announce = await authorI.channel?.send({ content: `${authorI.user.toString()}, It is not an image URL or image.` }) as Message;
-                this.deleteTarget(message, res, this.noteMessage);
-                await this.sleep(3000).then(() => announce.delete());
+                return;
             }
+            if (!this.isImageURL(res.content)) return this.onIsNot(interaction, 'This url isn\'t a valid.', res, sent, this.note);
+            switch (value) {
+                case 'icon': await this.baseInteraction.editReply({ embeds: [this.embed.setAuthor({ name: author.name, url: author.url, iconURL: res.content })] }); this.deleteMessages(res, sent, this.note);
+                    break;
+
+                case 'thumbnail': await this.baseInteraction.editReply({ embeds: [this.embed.setThumbnail(res.content)] }); this.deleteMessages(res, sent, this.note);
+                    break;
+
+                case 'image': await this.baseInteraction.editReply({ embeds: [this.embed.setImage(res.content)] }); this.deleteMessages(res, sent, this.note);
+                    break;
+            }
+            return;
+        }
+
+        switch (value) {
+            case 'icon': await this.baseInteraction.editReply({ embeds: [this.embed.setAuthor({ name: author.name, url: author.url, iconURL: file.url })] }); this.deleteMessages(res, sent, this.note);
+                break;
+
+            case 'thumbnail': await this.baseInteraction.editReply({ embeds: [this.embed.setThumbnail(file.url)] }); this.deleteMessages(res, sent, this.note);
+                break;
+
+            case 'image': await this.baseInteraction.editReply({ embeds: [this.embed.setImage(file.url)] }); this.deleteMessages(res, sent, this.note);
+                break;
         }
     }
 
-    private checkUrl(str: string) {
-        // eslint-disable-next-line no-useless-escape
-        if (str.match(/(http[s]?|ftp):\/\/[^\/\.]+?\..+\w$/i) === null) {
-            return false;
-        } else {
-            return true;
-        }
-    }
+    private readonly isHEX = (target: string) => !!target.match(/[0-9A-Fa-f]{6}/g);
 
-    private isImageUrl(str: string) {
-        return /\.(jpg|jpeg|png|webp|avif|gif|svg)$/.test(str);
-    }
+    // eslint-disable-next-line no-useless-escape
+    private readonly isURL = (target: string) => !!target.match(/https?:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#\u3000-\u30FE\u4E00-\u9FA0\uFF01-\uFFE3]+/g);
 
-    private deleteTarget(...target: Message[]): Promise<Message>[] {
-        return target.map(t => t.delete());
-    }
+    private readonly isImageURL = (target: string) => !!target.match(/\.(jpg|jpeg|png|webp|avif|gif|svg)$/);
 
-    private buildEmbeds(
-        title: string,
-        titleUrl: string,
-        description: string,
-        author: EmbedAuthorData,
-        isTimestamp: boolean,
-    ) {
-        if (isTimestamp) {
-            return [
-                new MessageEmbed()
-                    .setTitle(title)
-                    .setURL(titleUrl)
-                    .setDescription(description)
-                    .setAuthor(author)
-                    .setTimestamp(),
-            ];
-        } else {
-            return [
-                new MessageEmbed()
-                    .setTitle(title)
-                    .setURL(titleUrl)
-                    .setDescription(description)
-                    .setAuthor(author),
-            ];
-        }
-    }
-
-    private buildComponents(
-        customId: string,
-    ) {
-        return [
-            new MessageActionRow().addComponents(
-                new MessageSelectMenu()
-                    .setCustomId(customId)
-                    .addOptions(
-                        {
-                            label: 'title',
-                            description: 'Your embed\'s title.',
-                            value: 'title',
-                        },
-                        {
-                            label: 'description',
-                            description: 'Your embed\'s description.',
-                            value: 'description',
-                        },
-                        {
-                            label: 'titleUrl',
-                            description: 'Change a title\'s url.',
-                            value: 'titleUrl',
-                        },
-                        {
-                            label: 'author',
-                            description: 'Set a author options.',
-                            value: 'author',
-                        },
-                        {
-                            label: 'timestamp',
-                            description: 'Add a timestamp.',
-                            value: 'timestamp',
-                        },
-                    ),
-            ),
-        ];
-    }
+    private readonly deleteMessages = (...messages: Message[]) => messages.map(message => message.delete());
 
     private readonly sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    private async onIsNot(interaction: SelectMenuInteraction<'cached'>, content: string, ...messages: Message[]) {
+        const announce = await interaction.channel?.send({ content: content });
+        this.deleteMessages(...messages);
+        await this.sleep(3000).then(() => announce?.delete());
+    }
+
+    private async onChannel(sent: Message, res: Message) {
+        const mention = res.mentions.channels.first();
+        if (!mention) return this.onIsNot(this.baseInteraction, 'You must send only mentions.', sent, res, this.note);
+        if (!mention.isText()) return this.onIsNot(this.baseInteraction, 'You must send only channel mentions.', sent, res, this.note);
+        await mention.send({ embeds: [this.embed] });
+        this.deleteMessages(sent, res, this.note);
+    }
 }

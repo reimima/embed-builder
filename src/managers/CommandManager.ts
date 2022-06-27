@@ -22,14 +22,15 @@ export class CommandManager extends Collection<string, Command> {
     }
 
     public async subscribe(): Promise<void> {
-        const subscribed = await this.client.application?.commands.fetch() ?? new Collection();
+        const guild = this.client.guilds.cache.get('975311610522505237');
+
+        if (!guild) return;
+        const subscribed = await guild.commands.fetch() ?? new Collection();
+        // this.client.application?.commands.fetch()
 
         const diffAdded = this.filter(c => !subscribed.find(s => s.name === c.data.name));
         const diffRemoved = subscribed?.filter(s => !this.find(c => s.name === c.data.name));
         const diff = this.filter(c => !(subscribed.find(s => s.name === c.data.name)?.equals(c.data) ?? false));
-        const guild = this.client.guilds.cache.get('975311610522505237');
-
-        if (!guild) return;
 
         for (const add of diffAdded.values()) {
             await guild.commands.create(add.data);

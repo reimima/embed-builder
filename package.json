@@ -26,6 +26,7 @@
     "@keyv/sqlite": "^3.5.2",
     "discord.js": "^13.7.0",
     "dotenv": "^16.0.0",
-    "keyv": "^4.3.0"
+    "keyv": "^4.3.0",
+    "node-fetch": "2.6.6"
   }
 }
