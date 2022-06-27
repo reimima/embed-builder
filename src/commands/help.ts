@@ -21,7 +21,7 @@ export default class extends Command {
 
                 This bot has just been developed.
 
-                If you need help or have any ideas for Embed Builder, Join the support server!
+                If you need help or have any ideas for Embed Builder, join the support server!
 
                 I hope enjoy this bot!
             `).addFields(
