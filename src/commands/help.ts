@@ -26,7 +26,7 @@ export default class extends Command {
                 I hope enjoy this bot!
             `).addFields(
                 { name: 'author', value: 'reimima#3439' },
-                { name: 'support server', value: '[here]()' },
+                { name: 'support server', value: '[here](https://discord.gg/3NbSVj9qSc)' },
                 { name: 'github', value: '[here](https://github.com/reimima/embed-builder)' },
             )] });
     }
