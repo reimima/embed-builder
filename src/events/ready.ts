@@ -10,7 +10,7 @@ export default class extends Event {
         console.info('Succesfully logged in and is Ready.');
         console.info(`The bot is participating in ${this.client.guilds.cache.size ?? 'none'} servers.`);
 
-        this.client.user?.setActivity({ name: `Help by slash command.` });
+        this.client.user?.setActivity({ name: `Help by slash command` });
 
         console.info('Starting to subscribe commands to Discord Server.');
         await this.client.commandManager.subscribe()
