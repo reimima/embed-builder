@@ -26,6 +26,7 @@ export default class extends Command {
                 I hope enjoy this bot!
             `).addFields(
                 { name: 'author', value: 'reimima#3439' },
+                { name: 'invite link', value: '[here](https://discord.com/api/oauth2/authorize?client_id=990063935308836864&permissions=414464732224&scope=bot%20applications.commands)' },
                 { name: 'support server', value: '[here](https://discord.gg/3NbSVj9qSc)' },
                 { name: 'github', value: '[here](https://github.com/reimima/embed-builder)' },
             )] });
