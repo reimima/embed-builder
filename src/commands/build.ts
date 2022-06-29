@@ -1,6 +1,6 @@
 import type { Bot } from '../Bot';
 import type { Message, SelectMenuInteraction, GuildTextBasedChannel, EmbedFieldData, CommandInteraction, Interaction, ColorResolvable, MessageEmbedAuthor, MessageEmbedFooter, ButtonInteraction } from 'discord.js';
-import { MessageEmbed, MessageActionRow, MessageSelectMenu, InteractionCollector, MessageButton } from 'discord.js';
+import { MessageEmbed, MessageActionRow, MessageSelectMenu, InteractionCollector, MessageButton, MessageAttachment } from 'discord.js';
 import { Command } from '../interfaces';
 
 export default class extends Command {
@@ -82,9 +82,17 @@ export default class extends Command {
                 description: 'Setting channel you want to send.',
                 value: 'channel',
             }, {
+                label: 'export',
+                description: 'Export the embed source.',
+                value: 'export',
+            }, {
                 label: 'exit',
                 description: 'Exit from here.',
                 value: 'exit',
+            }, {
+                label: 'delete',
+                description: 'Delete options menu and messages.',
+                value: 'delete',
             }));
 
         interaction.reply({
@@ -101,7 +109,6 @@ export default class extends Command {
             if (!selectMenuI.isSelectMenu()) return;
             this.baseInteraction = selectMenuI; await this.onSelectMenuI();
         });
-        collecter.on('end', () => collecter.stop());
     }
 
     private async onSelectMenuI() {
@@ -139,7 +146,12 @@ export default class extends Command {
 
             case 'channel': this.note = await this.channel.send({ embeds: [{ description: `- You must send only channel mentions.` }] }); break;
 
+            case 'export': this.onExport(); return;
+
             case 'exit': this.baseInteraction.deleteReply(); this.baseInteraction.channel?.send({ embeds: [this.baseInteraction.message.embeds[0] as MessageEmbed] });
+                return;
+
+            case 'delete': this.baseInteraction.deleteReply();
                 return;
         }
 
@@ -195,16 +207,12 @@ export default class extends Command {
             { name: 'iconURL?', value: 'Set a url of author icon. You can delete this option.' }, { name: 'exit', value: 'Exit from here.' },
         )], components: [selectmenu] });
 
-        const collecter = new InteractionCollector(this.client, {
-            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
-            time: 300000,
-        });
+        const collecter = new InteractionCollector(this.client, { filter: collected => collected.isSelectMenu() && customId.includes(collected.customId) });
 
         collecter.on('collect', async (interaction: Interaction<'cached'>) => {
             if (!interaction.isSelectMenu()) return;
             await this.onAuthorCollected(interaction);
         });
-        collecter.on('end', () => collecter.stop());
     }
 
     private async onCaseFooter() {
@@ -220,16 +228,12 @@ export default class extends Command {
             { name: 'text', value: 'Set a text of footer.' }, { name: 'iconURL?', value: 'Set a url of footer icon. You can delete this option.' }, { name: 'exit', value: 'Exit from here.' },
         )], components: [selectmenu] });
 
-        const collecter = new InteractionCollector(this.client, {
-            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
-            time: 300000,
-        });
+        const collecter = new InteractionCollector(this.client, { filter: collected => collected.isSelectMenu() && customId.includes(collected.customId) });
 
         collecter.on('collect', async (interaction: Interaction<'cached'>) => {
             if (!interaction.isSelectMenu()) return;
             await this.onFooterCollected(interaction);
         });
-        collecter.on('end', () => collecter.stop());
     }
 
     private async onCaseFields() {
@@ -242,22 +246,17 @@ export default class extends Command {
                     { label: 'uninline', description: 'Setting inline off.', value: 'uninline' },
                     { label: 'number', description: 'Sets the number of fields. You can choose from `1 ~ 25`', value: 'number' },
                     { label: 'exit', description: 'Exit from here.', value: 'exit' }));
-
         await this.channel.send({ embeds: [new MessageEmbed().setTitle('Options of fields.').addFields(
             { name: 'individual', value: 'Set for each field.' }, { name: 'inline', value: 'Setting inline on.' }, { name: 'uninline', value: 'Setting inline off.' },
             { name: 'number', value: 'Sets the number of fields. You can choose from `1 ~ 25`' }, { name: 'exit', value: 'Exit from here.' },
         )], components: [selectmenu] });
 
-        const collecter = new InteractionCollector(this.client, {
-            filter: collected => collected.isSelectMenu() && customId.includes(collected.customId),
-            time: 300000,
-        });
+        const collecter = new InteractionCollector(this.client, { filter: collected => collected.isSelectMenu() && customId.includes(collected.customId) });
 
         collecter.on('collect', async (interaction: Interaction<'cached'>) => {
             if (!interaction.isSelectMenu()) return;
             await this.onFieldsCollected(interaction);
         });
-        collecter.on('end', () => collecter.stop());
     }
 
     private async onAuthorCollected(interaction: SelectMenuInteraction<'cached'>) {
@@ -346,7 +345,6 @@ export default class extends Command {
                 this.baseInteraction.editReply({ embeds: [this.embed.setFields(this.fields)] });
                 break;
 
-
             case 'number': this.onFieldsNumber(); break;
 
             case 'exit': interaction.deleteReply(); break;
@@ -370,16 +368,12 @@ export default class extends Command {
             { label: 'exit', description: 'Exit from here.', value: 'exit' },
         ))] });
 
-        const collecter = new InteractionCollector(this.client, {
-            filter: interactionCollected => interactionCollected.isSelectMenu() && customId.includes(interactionCollected.customId),
-            time: 300000,
-        });
+        const collecter = new InteractionCollector(this.client, { filter: interactionCollected => interactionCollected.isSelectMenu() && customId.includes(interactionCollected.customId) });
 
         collecter.on('collect', async (interaction: Interaction<'cached'>) => {
             if (!interaction.isSelectMenu()) return;
             await this.onFieldsIndividualCollected(interaction, Number(res.content));
         });
-        collecter.on('end', () => collecter.stop());
     }
 
     private async onFieldsIndividualCollected(interaction: SelectMenuInteraction<'cached'>, number: number) {
@@ -430,7 +424,6 @@ export default class extends Command {
             if (!interaction.isButton()) return;
             this.onNumberButtonCollected(interaction, plusCustomId, minusCustomId, deleteCustomId);
         });
-        collecter.on('end', () => collecter.stop());
     }
 
     private async onNumberButtonCollected(interaction: ButtonInteraction<'cached'>, plusCustomId: string, minusCustomId: string, deleteCustomId: string) {
@@ -489,6 +482,12 @@ export default class extends Command {
             case 'image': await this.baseInteraction.editReply({ embeds: [this.embed.setImage(file.url)] }); this.deleteMessages(res, sent, this.note);
                 break;
         }
+    }
+
+    private async onExport() {
+        const file = new MessageAttachment(Buffer.from(JSON.stringify(this.baseInteraction.message.embeds[0]?.toJSON())), 'embed.json'),
+            sent = await this.channel.send({ content: 'Delete message after 30 seconds.', files: [file] });
+        await this.sleep(30000); sent.delete();
     }
 
     private readonly isHEX = (target: string) => !!target.match(/[0-9A-Fa-f]{6}/g);
