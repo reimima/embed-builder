@@ -8,6 +8,7 @@ export default class extends Command {
         super(client, {
             name: 'export',
             description: 'Send the embed source of the specified message.',
+            defaultPermission: true,
             options: [{
                 name: 'id',
                 description: 'ID of the specified message.',
