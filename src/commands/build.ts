@@ -15,7 +15,6 @@ export default class extends Command {
         super(client, {
             name: 'build',
             description: 'Let\'s make your own embed!',
-            defaultPermission: true,
         });
 
         this.fields = [{ name: 'Some name.', value: 'Some value.' }];

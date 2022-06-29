@@ -8,7 +8,6 @@ export default class extends Command {
         super(client, {
             name: 'import',
             description: 'Load the embed source.',
-            defaultPermission: true,
             options: [{
                 name: 'source',
                 description: 'Embed source.',
