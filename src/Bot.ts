@@ -7,7 +7,7 @@ export class Bot extends Client {
 
     public constructor() {
         super({
-            intents: ['GUILDS', 'GUILD_INTEGRATIONS', 'GUILD_MESSAGES', 'GUILD_WEBHOOKS'],
+            intents: ['GUILDS', 'GUILD_INTEGRATIONS', 'GUILD_MESSAGES'],
             restTimeOffset: 0,
             http: { api: 'https://canary.discord.com/api' },
         });
