@@ -1,6 +1,7 @@
 # Embed Builder
 
 This bot has just been developed.
+
 This bot is not open to the public.
 
 # Author
