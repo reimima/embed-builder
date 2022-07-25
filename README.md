@@ -2,10 +2,6 @@
 
 This bot has just been developed.
 
-# Usage
-
-If you want help, you can use /help command.
-
 # Author
 
 reimima#3439
